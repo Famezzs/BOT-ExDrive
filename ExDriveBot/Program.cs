@@ -34,7 +34,7 @@ namespace ExDriveBot
     {
         static System.Net.Http.HttpClient http = new System.Net.Http.HttpClient();
         private static string _token = "***REMOVED***";
-        static TelegramBotClient _client = new TelegramBotClient(_token, http, "http://localhost:8081/bot"); // запуск локально
+        static TelegramBotClient _client = new TelegramBotClient(_token, http, "http://localhost:8081/"); // запуск локально
         // static TelegramBotClient _client = new TelegramBotClient(_token);                                 // запуск на серверах Telegram
         static string auditName = "audit.json";
         static List<BotUpdate> botUpdates = new List<BotUpdate>();
@@ -66,65 +66,75 @@ namespace ExDriveBot
 
         private static Task ErrorHandler(ITelegramBotClient arg1, Exception arg2, CancellationToken arg3)
         {
-                throw new NotImplementedException();
+            throw new Exception("An error occured");
         }
 
         private static async Task UpdateHandler(ITelegramBotClient _client, Update update, CancellationToken arg3)
         {
-            if(update.Type == UpdateType.Message)
+            try
             {
-                if (update.Message.Type == MessageType.Document)
+                if (update.Type == UpdateType.Message)
                 {
-                    string id = update.Message.Document.FileId;
-                    long chatid = update.Message.Chat.Id;
-                    string name = update.Message.Document.FileName;
-                    int? pre_size = update.Message.Document.FileSize;
-                    if (pre_size <= 2000000000)
+                    if (update.Message.Type == MessageType.Document)
                     {
-                        Telegram.Bot.Types.File _download = await _client.GetFileAsync(id);
-                        int? size = _download.FileSize;
-
-                        var _botUpdate = new BotUpdate
+                        string id = update.Message.Document.FileId;
+                        long chatid = update.Message.Chat.Id;
+                        string name = update.Message.Document.FileName;
+                        int? pre_size = update.Message.Document.FileSize;
+                        if (pre_size <= 2000000000)
                         {
-                            chat_id = chatid,
-                            username = update.Message.Chat.Username,
-                            file_id = id,
-                            file_name = name,
-                            file_size = size,
-                            file_status = "Done",
-                        };
-                        //InputOnlineFile inputOnlineFile = new InputOnlineFile(id);
-                        //await _client.SendDocumentAsync()
-                        // Stream destination = new MemoryStream();
-                        // await _client.DownloadFileAsync(path, destination);
-                        Console.WriteLine($"\"{name}\" finished downloading ({size} bits)");
+                            Telegram.Bot.Types.File _download;
+                            _download = await _client.GetFileAsync(id);
+                            var path = _download.FilePath;
+                            int? size = _download.FileSize;
 
-                        //if (destination.Length > 0)
-                          //  _botUpdate.file_status = "Downloaded";
-                        //else
-                          //  _botUpdate.file_status = "Error during download";
-                        //string designation = $@"D:\Bot\{name}";
-                        //var fileStream = System.IO.File.Create(designation);
-                        //destination.Seek(0, SeekOrigin.Begin);
-                        //destination.CopyTo(fileStream);
-                        //if (fileStream.Length > 0)
-                          //  _botUpdate.file_status = "Written";
-                        //else
-                          //  _botUpdate.file_status = "Error during writing";
-                        //fileStream.Close();
+                            var _botUpdate = new BotUpdate
+                            {
+                                chat_id = chatid,
+                                username = update.Message.Chat.Username,
+                                file_id = id,
+                                file_name = name,
+                                file_size = size,
+                                file_status = "Done",
+                            };
+                            //InputOnlineFile inputOnlineFile = new InputOnlineFile(id);
+                            //await _client.SendDocumentAsync()
+                            // Stream destination = new MemoryStream();
+                            // await _client.DownloadFileAsync(path, destination);
+                            Console.WriteLine($"\"{name}\" finished downloading ({size} bits)");
 
-                        botUpdates.Add(_botUpdate);
-                        var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
+                            //if (destination.Length > 0)
+                            //  _botUpdate.file_status = "Downloaded";
+                            //else
+                            //  _botUpdate.file_status = "Error during download";
+                            //string designation = $@"D:\Bot\{name}";
+                            //var fileStream = System.IO.File.Create(designation);
+                            //destination.Seek(0, SeekOrigin.Begin);
+                            //destination.CopyTo(fileStream);
+                            //if (fileStream.Length > 0)
+                            //  _botUpdate.file_status = "Written";
+                            //else
+                            //  _botUpdate.file_status = "Error during writing";
+                            //fileStream.Close();
 
-                        System.IO.File.WriteAllText(auditName, botUpdatesString);
-                        await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": ");
-                    }
-                    else
-                    {
-                        await _client.SendTextMessageAsync(chatid, $"Download of \"{name}\" failed.");
+                            botUpdates.Add(_botUpdate);
+                            var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
+
+                            System.IO.File.WriteAllText(auditName, botUpdatesString);
+                            await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": ");
+                        }
+                        else
+                        {
+                            await _client.SendTextMessageAsync(chatid, $"Download of \"{name}\" failed.");
+                        }
+
                     }
                 }
             }
-        }
+            catch(Exception)
+            {
+
+            }
+        }       
     }
 }
