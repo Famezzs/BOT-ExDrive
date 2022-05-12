@@ -2,7 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
@@ -93,23 +96,33 @@ namespace ExDriveBot
                 string name = update.Message.Document.FileName;
                 int? pre_size = update.Message.Document.FileSize;
 
-
                 Telegram.Bot.Types.File _download;
                 _download = await _client.GetFileAsync(id, cancellationToken: arg3);
                 var path = _download.FilePath;
-
-                //string format = "";
-                //for (int i = path.LastIndexOf('.'); i < path.Length; i++)
-                //    format += path[i];
-
+                
                 string abspath = path.Remove(path.LastIndexOf('\\'));
                 string newname = Guid.NewGuid().ToString();
 
                 System.IO.Directory.CreateDirectory(Path.Combine(abspath, newname));
                 System.IO.File.Move(path, abspath + "\\" + newname + "\\" + name);
 
-                using (FileStream stream = System.IO.File.OpenRead(path: abspath + "\\" + newname + "\\" + name))
+                string? file = null;
+                using (Stream stream = System.IO.File.OpenRead(path: abspath + "\\" + newname + "\\" + name))
                 {
+                    //HttpWebRequest request = WebRequest.CreateHttp("https://localhost:44370/Storage/UploadTempFileBot");
+                    //request.Method = "POST";
+                    //request.AllowReadStreamBuffering = false;
+                    //request.ContentType = "application/octet-stream";
+                    //var dummyBuffer = new UnicodeEncoding().GetBytes("this is dummy stream");
+                    //var dummyStream = new MemoryStream(dummyBuffer).AsRandomAccessStream().AsStream();
+                    var requestContent = new MultipartFormDataContent();
+                    var inputData = new StreamContent(stream);
+                    inputData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                    requestContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                    requestContent.Add(inputData, name);
+                    
+                    HttpResponseMessage response = http.PostAsync("https://localhost:44370/Storage/UploadTempFileBot", inputData).Result;
+                    file = response.Content.ReadAsStringAsync().Result;
                 }
 
                 int? size = _download.FileSize;
@@ -125,32 +138,17 @@ namespace ExDriveBot
                 };
 
                 Console.WriteLine($"\"{name}\" finished downloading ({size} bits)");
-                //InputOnlineFile inputOnlineFile = new InputOnlineFile(id);
-                //await _client.SendDocumentAsync()
-                // Stream destination = new MemoryStream();
-                // await _client.DownloadFileAsync(path, destination);
-
-                //if (destination.Length > 0)
-                //  _botUpdate.file_status = "Downloaded";
-                //else
-                //  _botUpdate.file_status = "Error during download";
-                //string designation = $@"D:\Bot\{name}";
-                //var fileStream = System.IO.File.Create(designation);
-                //destination.Seek(0, SeekOrigin.Begin);
-                //destination.CopyTo(fileStream);
-                //if (fileStream.Length > 0)
-                //  _botUpdate.file_status = "Written";
-                //else
-                //  _botUpdate.file_status = "Error during writing";
-                //fileStream.Close();
-
                 botUpdates.Add(_botUpdate);
                 var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
 
                 System.IO.File.WriteAllText(auditName, botUpdatesString);
-                await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": ", cancellationToken: arg3);
+                await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + file, cancellationToken: arg3);
             }
-            catch (Exception)
+            catch(System.FormatException e)
+            {
+
+            }
+            catch (Exception e)
             {
                 return;
             }
