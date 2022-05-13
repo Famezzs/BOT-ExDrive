@@ -69,6 +69,8 @@ namespace ExDriveBot
 
             var receiverOptions = new ReceiverOptions
             {
+                Offset = (int?)updatesNum.ToArray()[0].updates,
+                Limit = 100,
                 AllowedUpdates = new UpdateType[]
                 {
                     UpdateType.Message,
