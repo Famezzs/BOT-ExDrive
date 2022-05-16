@@ -78,7 +78,6 @@ namespace ExDriveBot
             };
 
             _client.StartReceiving(UpdateHandler, ErrorHandler, receiverOptions);
-            //_client.GetUpdatesAsync((int)(updatesNum.ToArray()[0].updates), 100);
             Console.ReadLine();
         }
 
@@ -131,7 +130,7 @@ namespace ExDriveBot
                     inputData.Headers.Add("file-name", name.Unidecode());
                     requestContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
                     
-                    HttpResponseMessage response = http.PostAsync("https://localhost:44370/Storage/UploadTempFileBot", inputData, arg3).Result;
+                    HttpResponseMessage response = http.PostAsync("https://localhost:443/Storage/UploadTempFileBot", inputData, arg3).Result;
                     if (((int)response.StatusCode) != 200)
                     {
                         await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + file, cancellationToken: arg3);
@@ -162,6 +161,7 @@ namespace ExDriveBot
 
                 Console.WriteLine($"\"{name.Unidecode()}\" finished downloading ({size} bits)");
                 botUpdates.Add(_botUpdate);
+
                 var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
                 var updatesNumberString = JsonConvert.SerializeObject(updatesNum);
 
