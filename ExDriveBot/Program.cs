@@ -13,6 +13,7 @@ using Telegram.Bot;
 using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.InputFiles;
 
 using UnidecodeSharpFork;
 
@@ -94,8 +95,30 @@ namespace ExDriveBot
         {
             try
             {
-                if (update.Type != UpdateType.Message ||
-                    update.Message.Type != MessageType.Document)
+                if (update.Type != UpdateType.Message)
+                {
+                    return;
+                }
+
+                if (update.Message.Type == MessageType.Sticker)
+                {
+                    InputOnlineFile onlineFile = new("https://media.giphy.com/media/CHQYQUsiWFggJ49tJB/giphy.gif");
+
+                    _ = await _client.SendAnimationAsync(update.Message.Chat.Id, onlineFile, cancellationToken: arg3);
+
+                    return;
+                }
+
+                if (update.Message.Type == MessageType.Voice)
+                {
+                    InputOnlineFile onlineFile = new("https://media.giphy.com/media/848sepFf5US1WT8L7N/giphy.gif");
+
+                    _ = await _client.SendAnimationAsync(update.Message.Chat.Id, onlineFile, cancellationToken: arg3);
+
+                    return;
+                }
+
+                if (update.Message.Type != MessageType.Document)
                 {
                     return;
                 }
@@ -106,7 +129,8 @@ namespace ExDriveBot
                     update.Message.Type == MessageType.Unknown)
                 {
                     await _client.SendTextMessageAsync(update.Message.Chat.Id, 
-                        $@"Please send me files as ocuments instead.", cancellationToken: arg3);
+                        $@"Please send me files as documents instead.", cancellationToken: arg3);
+
                     return;
                 }
 
@@ -114,6 +138,7 @@ namespace ExDriveBot
                 {
                     await _client.SendTextMessageAsync(update.Message.Chat.Id,
                         $@"File size should be more than 650mb.", cancellationToken: arg3);
+
                     return;
                 }
 
@@ -150,8 +175,9 @@ namespace ExDriveBot
                     if (((int)response.StatusCode) != 200)
                     {
                         _ = await _client.SendTextMessageAsync(_chatid, 
-                            $"Download link for \"{name}\": " + downloadlink,
+                            $"Download of \"{name}\" failed. Please try again.",
                             cancellationToken: arg3);
+
                         return;
                     }
                 }
