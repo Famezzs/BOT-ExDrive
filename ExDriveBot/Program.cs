@@ -22,45 +22,48 @@ namespace ExDriveBot
 {
     struct BotUpdate
     {
-        public long chat_id;
-        public string? username;
-        public string file_id;
-        public string file_name;
-        public int? file_size;
-        public string file_status;
+        public long ChatId;
+        public string UserName;
+        public string FileId;
+        public string FileName;
+        public int FileSize;
     }
 
     struct Updates
     {
-        public long updates;   
+        public int UpdatesCount;
     }
 
     class Program
     {
         private static readonly string _token = "***REMOVED***";
-        private static readonly string auditName = "audit.json";
-        private static readonly string updatesName = "updates.json";
 
-        private static readonly System.Net.Http.HttpClient http = new();
-        private static readonly TelegramBotClient _client = new(_token, http, "http://localhost:8081/");
+        private static readonly string _auditName = "audit.json";
+        private static readonly string _updatesName = "updates.json";
 
-        private static List<BotUpdate> botUpdates = new();
-        private static List<Updates> updatesNum = new();
+        private static readonly System.Net.Http.HttpClient _http = new();
+        private static readonly TelegramBotClient _client = new(_token, _http, "http://localhost:8081/");
+        private static readonly string _postUrl = "https://localhost:44370/Storage/UploadTempFileBot";
 
-        private static long chatid;
+        private static List<Updates> _updatesCount = new();
+        private static List<BotUpdate> _botUpdates = new();
+        private static readonly long _maxFileSize = 620000000;  // File size is represented in bits
+
+        private static long _chatid;
+
         static void Main()
         {
             try
             {
-                var botUpdatesString = System.IO.File.ReadAllText(auditName);
+                var botUpdatesString = System.IO.File.ReadAllText(_auditName);
 
-                botUpdates = JsonConvert.DeserializeObject<List<BotUpdate>>(botUpdatesString) ??
-                    botUpdates;
+                _botUpdates = JsonConvert.DeserializeObject<List<BotUpdate>>(botUpdatesString) ??
+                    _botUpdates;
 
-                var updatesNumber = System.IO.File.ReadAllText(updatesName);
+                var updatesNumber = System.IO.File.ReadAllText(_updatesName);
 
-                updatesNum = JsonConvert.DeserializeObject<List<Updates>>(updatesNumber) ??
-                    updatesNum;
+                _updatesCount = JsonConvert.DeserializeObject<List<Updates>>(updatesNumber) ??
+                    _updatesCount;
             }
             catch (Exception ex)
             {
@@ -69,7 +72,7 @@ namespace ExDriveBot
 
             var receiverOptions = new ReceiverOptions
             {
-                Offset = (int?)updatesNum.ToArray()[0].updates,
+                Offset = _updatesCount.ToArray()[0].UpdatesCount,
                 Limit = 100,
                 AllowedUpdates = new UpdateType[]
                 {
@@ -78,6 +81,7 @@ namespace ExDriveBot
             };
 
             _client.StartReceiving(UpdateHandler, ErrorHandler, receiverOptions);
+
             Console.ReadLine();
         }
 
@@ -90,33 +94,40 @@ namespace ExDriveBot
         {
             try
             {
-                if (update.Type != UpdateType.Message)
+                if (update.Type != UpdateType.Message ||
+                    update.Message.Type != MessageType.Document)
                 {
                     return;
                 }
 
-                if (update.Message.Type != MessageType.Document)
+                if (update.Message.Type == MessageType.Audio ||
+                    update.Message.Type == MessageType.Photo ||
+                    update.Message.Type == MessageType.Video ||
+                    update.Message.Type == MessageType.Unknown)
                 {
-                    await _client.SendTextMessageAsync(update.Message.Chat.Id, $"Please send me files as documents instead.", cancellationToken: arg3);
+                    await _client.SendTextMessageAsync(update.Message.Chat.Id, 
+                        $@"Please send me files as ocuments instead.", cancellationToken: arg3);
                     return;
                 }
 
-                if (update.Message.Document.FileSize > 620000000)
+                if (update.Message.Document.FileSize > _maxFileSize)
                 {
-                    await _client.SendTextMessageAsync(update.Message.Chat.Id, $"File size should be less than 650mb.", cancellationToken: arg3);
+                    await _client.SendTextMessageAsync(update.Message.Chat.Id,
+                        $@"File size should be more than 650mb.", cancellationToken: arg3);
                     return;
                 }
+
+                _chatid = update.Message.Chat.Id;
 
                 string id = update.Message.Document.FileId;
-                chatid = update.Message.Chat.Id;
                 string name = update.Message.Document.FileName;
-                int? pre_size = update.Message.Document.FileSize;
 
                 Telegram.Bot.Types.File _download;
                 _download = await _client.GetFileAsync(id, cancellationToken: arg3);
+
                 var path = _download.FilePath;
-                
                 string abspath = path.Remove(path.LastIndexOf('\\'));
+
                 string newname = Guid.NewGuid().ToString();
 
                 System.IO.Directory.CreateDirectory(Path.Combine(abspath, newname));
@@ -130,65 +141,72 @@ namespace ExDriveBot
 
                     inputData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                     inputData.Headers.Add("file-name", name.Unidecode());
+
                     requestContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-                    
-                    HttpResponseMessage response = http.PostAsync("https://localhost:443/Storage/UploadTempFileBot", inputData, arg3).Result;
+
+                    HttpResponseMessage response = _http.PostAsync(_postUrl, inputData, arg3).Result;
+                    downloadlink = response.Content.ReadAsStringAsync(arg3).Result;
+
                     if (((int)response.StatusCode) != 200)
                     {
-                        _ = await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + downloadlink,
-                                                            cancellationToken: arg3);
+                        _ = await _client.SendTextMessageAsync(_chatid, 
+                            $"Download link for \"{name}\": " + downloadlink,
+                            cancellationToken: arg3);
                         return;
                     }
-
-                    downloadlink = response.Content.ReadAsStringAsync(arg3).Result;
                 }
 
-                int? size = _download.FileSize;
+                int size = (int)_download.FileSize;
 
-                BotUpdate _botUpdate = new()
+                BotUpdate botUpdate = new()
                 {
-                    chat_id = chatid,
-                    username = update.Message.Chat.Username,
-                    file_id = id,
-                    file_name = name,
-                    file_size = size,
-                    file_status = "Done",
+                    ChatId = _chatid,
+                    UserName = update.Message.Chat.Username,
+                    FileId = id,
+                    FileName = name,
+                    FileSize = size,
                 };
 
-                Updates _updates = new()
+                Updates updates = new()
                 {
-                    updates = updatesNum.ToArray()[0].updates + 1,
+                    UpdatesCount = _updatesCount.ToArray()[0].UpdatesCount + 1,
                 };
 
-                updatesNum.Clear();
+                _updatesCount.Clear();
+                _updatesCount.Add(updates);
 
-                updatesNum.Add(_updates);
-                botUpdates.Add(_botUpdate);
+                _botUpdates.Add(botUpdate);
 
                 Console.WriteLine($"\"{name.Unidecode()}\" finished downloading ({size} bits)");
 
-                var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
-                var updatesNumberString = JsonConvert.SerializeObject(updatesNum);
+                var botUpdatesString = JsonConvert.SerializeObject(_botUpdates);
+                var updatesNumberString = JsonConvert.SerializeObject(_updatesCount);
 
-                System.IO.File.WriteAllText(auditName, botUpdatesString);
-                System.IO.File.WriteAllText(updatesName, updatesNumberString);
+                System.IO.File.WriteAllText(_auditName, botUpdatesString);
+                System.IO.File.WriteAllText(_updatesName, updatesNumberString);
 
                 if (!string.IsNullOrEmpty(downloadlink))
                 {
-                    _ = await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + downloadlink, cancellationToken: arg3);
+                    _ = await _client.SendTextMessageAsync(_chatid, $"Download link for \"{name}\": " + downloadlink,
+                        cancellationToken: arg3);
                 }
-
                 else
                 {
-                    _ = await _client.SendTextMessageAsync(chatid, $"Oops... It looks like something went worng. Please try again.", cancellationToken: arg3);
+                    _ = await _client.SendTextMessageAsync(_chatid,
+                        $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                        cancellationToken: arg3);
                 }
+
+                Directory.Delete(Path.Combine(abspath, newname), true);
             }
             catch (Exception)
             {
-                _ = await _client.SendTextMessageAsync(chatid, $"Oops... It looks like something went worng. Please try again.", cancellationToken: arg3);
+                _ = await _client.SendTextMessageAsync(_chatid, 
+                    $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                    cancellationToken: arg3);
 
                 return;
             }
-        }       
+        }
     }
 }
