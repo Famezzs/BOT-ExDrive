@@ -1,26 +1,22 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
-using System.Net;
+
+using System.Collections.Generic;
+
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
+
 using System.Threading;
 using System.Threading.Tasks;
+
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.InputFiles;
+
 using UnidecodeSharpFork;
 
-public class CustomException : Exception
-{
-    public CustomException(String message) : base(message)
-    { }
-}
+using Newtonsoft.Json;
 
 namespace ExDriveBot
 {
@@ -41,13 +37,17 @@ namespace ExDriveBot
 
     class Program
     {
-        private static readonly System.Net.Http.HttpClient http = new();
         private static readonly string _token = "***REMOVED***";
-        private static readonly TelegramBotClient _client = new(_token, http, "http://localhost:8081/"); // запуск локально
         private static readonly string auditName = "audit.json";
         private static readonly string updatesName = "updates.json";
+
+        private static readonly System.Net.Http.HttpClient http = new();
+        private static readonly TelegramBotClient _client = new(_token, http, "http://localhost:8081/");
+
         private static List<BotUpdate> botUpdates = new();
         private static List<Updates> updatesNum = new();
+
+        private static long chatid;
         static void Main()
         {
             try
@@ -94,11 +94,13 @@ namespace ExDriveBot
                 {
                     return;
                 }
+
                 if (update.Message.Type != MessageType.Document)
                 {
                     await _client.SendTextMessageAsync(update.Message.Chat.Id, $"Please send me files as documents instead.", cancellationToken: arg3);
                     return;
                 }
+
                 if (update.Message.Document.FileSize > 620000000)
                 {
                     await _client.SendTextMessageAsync(update.Message.Chat.Id, $"File size should be less than 650mb.", cancellationToken: arg3);
@@ -106,7 +108,7 @@ namespace ExDriveBot
                 }
 
                 string id = update.Message.Document.FileId;
-                long chatid = update.Message.Chat.Id;
+                chatid = update.Message.Chat.Id;
                 string name = update.Message.Document.FileName;
                 int? pre_size = update.Message.Document.FileSize;
 
@@ -118,10 +120,10 @@ namespace ExDriveBot
                 string newname = Guid.NewGuid().ToString();
 
                 System.IO.Directory.CreateDirectory(Path.Combine(abspath, newname));
-                System.IO.File.Move(path, abspath + "\\" + newname + "\\" + name);
+                System.IO.File.Move(path, Path.Combine(abspath, newname, name));
 
-                string file = "";
-                using (Stream stream = System.IO.File.OpenRead(path: abspath + "\\" + newname + "\\" + name))
+                string downloadlink = "";
+                using (Stream stream = System.IO.File.OpenRead(path: Path.Combine(abspath, newname, name)))
                 {
                     var requestContent = new MultipartFormDataContent();
                     var inputData = new StreamContent(stream);
@@ -133,10 +135,12 @@ namespace ExDriveBot
                     HttpResponseMessage response = http.PostAsync("https://localhost:443/Storage/UploadTempFileBot", inputData, arg3).Result;
                     if (((int)response.StatusCode) != 200)
                     {
-                        await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + file, cancellationToken: arg3);
+                        _ = await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + downloadlink,
+                                                            cancellationToken: arg3);
                         return;
                     }
-                    file = response.Content.ReadAsStringAsync(arg3).Result;
+
+                    downloadlink = response.Content.ReadAsStringAsync(arg3).Result;
                 }
 
                 int? size = _download.FileSize;
@@ -157,10 +161,11 @@ namespace ExDriveBot
                 };
 
                 updatesNum.Clear();
+
                 updatesNum.Add(_updates);
+                botUpdates.Add(_botUpdate);
 
                 Console.WriteLine($"\"{name.Unidecode()}\" finished downloading ({size} bits)");
-                botUpdates.Add(_botUpdate);
 
                 var botUpdatesString = JsonConvert.SerializeObject(botUpdates);
                 var updatesNumberString = JsonConvert.SerializeObject(updatesNum);
@@ -168,11 +173,20 @@ namespace ExDriveBot
                 System.IO.File.WriteAllText(auditName, botUpdatesString);
                 System.IO.File.WriteAllText(updatesName, updatesNumberString);
 
-                if (!String.IsNullOrEmpty(file))
-                    _ = await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + file, cancellationToken: arg3);
+                if (!string.IsNullOrEmpty(downloadlink))
+                {
+                    _ = await _client.SendTextMessageAsync(chatid, $"Download link for \"{name}\": " + downloadlink, cancellationToken: arg3);
+                }
+
+                else
+                {
+                    _ = await _client.SendTextMessageAsync(chatid, $"Oops... It looks like something went worng. Please try again.", cancellationToken: arg3);
+                }
             }
             catch (Exception)
             {
+                _ = await _client.SendTextMessageAsync(chatid, $"Oops... It looks like something went worng. Please try again.", cancellationToken: arg3);
+
                 return;
             }
         }       
