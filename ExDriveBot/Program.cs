@@ -42,18 +42,25 @@ namespace ExDriveBot
         private static readonly string _auditName = "audit.json";
         private static readonly string _updatesName = "updates.json";
 
-        private static readonly System.Net.Http.HttpClient _http = new();
+        private static readonly HttpClientHandler _clientHandler = new HttpClientHandler();
+        private static System.Net.Http.HttpClient _http;
         private static readonly TelegramBotClient _client = new(_token, _http, "http://localhost:8081/");
-        private static readonly string _postUrl = "https://localhost:44370/Storage/UploadTempFileBot";
+        private static readonly string _postUrl = "https://localhost:443/Storage/UploadTempFileBot";
 
         private static List<Updates> _updatesCount = new();
         private static List<BotUpdate> _botUpdates = new();
         private static readonly long _maxFileSize = 620000000;  // File size is represented in bits
 
+        private static string _absPath;
+        private static string _newName;
+
         private static long _chatid;
 
         static void Main()
         {
+            _clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+            _http = new(_clientHandler);
+
             try
             {
                 var botUpdatesString = System.IO.File.ReadAllText(_auditName);
@@ -66,10 +73,17 @@ namespace ExDriveBot
                 _updatesCount = JsonConvert.DeserializeObject<List<Updates>>(updatesNumber) ??
                     _updatesCount;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error reading or deserializing {ex}");
-            }
+                _updatesCount.Add(new Updates());
+                _botUpdates.Add(new BotUpdate());
+
+                var botUpdatesString = JsonConvert.SerializeObject(_botUpdates);
+                var updatesNumberString = JsonConvert.SerializeObject(_updatesCount);
+
+                System.IO.File.WriteAllText(_auditName, botUpdatesString);
+                System.IO.File.WriteAllText(_updatesName, updatesNumberString);
+;            }
 
             var receiverOptions = new ReceiverOptions
             {
@@ -151,15 +165,15 @@ namespace ExDriveBot
                 _download = await _client.GetFileAsync(id, cancellationToken: arg3);
 
                 var path = _download.FilePath;
-                string abspath = path.Remove(path.LastIndexOf('\\'));
+                _absPath = path.Remove(path.LastIndexOf('\\'));
 
-                string newname = Guid.NewGuid().ToString();
+                _newName = Guid.NewGuid().ToString();
 
-                System.IO.Directory.CreateDirectory(Path.Combine(abspath, newname));
-                System.IO.File.Move(path, Path.Combine(abspath, newname, name));
+                System.IO.Directory.CreateDirectory(Path.Combine(_absPath, _newName));
+                System.IO.File.Move(path, Path.Combine(_absPath, _newName, name));
 
                 string downloadlink = "";
-                using (Stream stream = System.IO.File.OpenRead(path: Path.Combine(abspath, newname, name)))
+                using (Stream stream = System.IO.File.OpenRead(path: Path.Combine(_absPath, _newName, name)))
                 {
                     var requestContent = new MultipartFormDataContent();
                     var inputData = new StreamContent(stream);
@@ -223,13 +237,15 @@ namespace ExDriveBot
                         cancellationToken: arg3);
                 }
 
-                Directory.Delete(Path.Combine(abspath, newname), true);
+                Directory.Delete(Path.Combine(_absPath, _newName), true);
             }
             catch (Exception)
             {
                 _ = await _client.SendTextMessageAsync(_chatid, 
                     $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
                     cancellationToken: arg3);
+
+                Directory.Delete(Path.Combine(_absPath, _newName), true);
 
                 return;
             }
