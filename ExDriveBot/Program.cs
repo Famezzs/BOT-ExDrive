@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 
 using System.Collections.Generic;
 
@@ -105,6 +106,11 @@ namespace ExDriveBot
             throw new Exception("An error occured");
         }
 
+        private static async void SendMessageAsync(string message, CancellationToken token)
+        {
+            _ = await _client.SendTextMessageAsync(_chatid, message, cancellationToken: token);
+        }
+
         private static async Task UpdateHandler(ITelegramBotClient _client, Update update, CancellationToken arg3)
         {
             try
@@ -113,6 +119,8 @@ namespace ExDriveBot
                 {
                     return;
                 }
+
+                _chatid = update.Message.Chat.Id;
 
                 if (update.Message.Type == MessageType.Sticker)
                 {
@@ -142,24 +150,28 @@ namespace ExDriveBot
                     update.Message.Type == MessageType.Video ||
                     update.Message.Type == MessageType.Unknown)
                 {
-                    await _client.SendTextMessageAsync(update.Message.Chat.Id, 
-                        $@"Please send me files as documents instead.", cancellationToken: arg3);
+                    SendMessageAsync($@"Please send me files as documents instead.", arg3);
+                    //_ = await _client.SendTextMessageAsync(update.Message.Chat.Id,
+                    //    $@"Please send me files as documents instead.", cancellationToken: arg3);
 
                     return;
                 }
 
                 if (update.Message.Document.FileSize > _maxFileSize)
                 {
-                    await _client.SendTextMessageAsync(update.Message.Chat.Id,
-                        $@"File size should be more than 650mb.", cancellationToken: arg3);
+                    SendMessageAsync($@"File size should be more than 650mb.", arg3);
+                    //_ = await _client.SendTextMessageAsync(update.Message.Chat.Id,
+                    //    $@"File size should be more than 650mb.", cancellationToken: arg3);
 
                     return;
                 }
 
-                _chatid = update.Message.Chat.Id;
-
                 string id = update.Message.Document.FileId;
                 string name = update.Message.Document.FileName;
+
+                SendMessageAsync($"Download for \"{name}\" started... You will be notified shortly once the link is ready!", arg3);
+                //_ = await _client.SendTextMessageAsync(_chatid, 
+                //    $"Started upload for {name}. You will be notified once the link is ready!", cancellationToken: arg3);
 
                 Telegram.Bot.Types.File _download;
                 _download = await _client.GetFileAsync(id, cancellationToken: arg3);
@@ -186,11 +198,13 @@ namespace ExDriveBot
                     HttpResponseMessage response = _http.PostAsync(_postUrl, inputData, arg3).Result;
                     downloadlink = response.Content.ReadAsStringAsync(arg3).Result;
 
-                    if (((int)response.StatusCode) != 200)
+                    if (response.StatusCode != HttpStatusCode.OK)
                     {
-                        _ = await _client.SendTextMessageAsync(_chatid, 
-                            $"Download of \"{name}\" failed. Please try again.",
-                            cancellationToken: arg3);
+                        SendMessageAsync($"Download of \"{name}\" failed. Please try again.",
+                            arg3);
+                        //_ = await _client.SendTextMessageAsync(_chatid, 
+                        //    $"Download of \"{name}\" failed. Please try again.",
+                        //    cancellationToken: arg3);
 
                         return;
                     }
@@ -217,7 +231,7 @@ namespace ExDriveBot
 
                 _botUpdates.Add(botUpdate);
 
-                Console.WriteLine($"\"{name.Unidecode()}\" finished downloading ({size} bits)");
+                //Console.WriteLine($"\"{name.Unidecode()}\" finished downloading ({size} bits)");
 
                 var botUpdatesString = JsonConvert.SerializeObject(_botUpdates);
                 var updatesNumberString = JsonConvert.SerializeObject(_updatesCount);
@@ -227,23 +241,28 @@ namespace ExDriveBot
 
                 if (!string.IsNullOrEmpty(downloadlink))
                 {
-                    _ = await _client.SendTextMessageAsync(_chatid, $"Download link for \"{name}\": " + downloadlink,
-                        cancellationToken: arg3);
+                    SendMessageAsync($"Download link for \"{name}\": {downloadlink}", arg3);
+                    //_ = await _client.SendTextMessageAsync(_chatid, $"Download link for \"{name}\": " + downloadlink,
+                    //    cancellationToken: arg3);
                 }
                 else
                 {
-                    _ = await _client.SendTextMessageAsync(_chatid,
-                        $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
-                        cancellationToken: arg3);
+                    SendMessageAsync($@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                        arg3);
+                    //_ = await _client.SendTextMessageAsync(_chatid,
+                    //    $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                    //    cancellationToken: arg3);
                 }
 
                 Directory.Delete(Path.Combine(_absPath, _newName), true);
             }
             catch (Exception)
             {
-                _ = await _client.SendTextMessageAsync(_chatid, 
-                    $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
-                    cancellationToken: arg3);
+                SendMessageAsync($@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                        arg3);
+                //_ = await _client.SendTextMessageAsync(_chatid, 
+                //    $@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
+                //    cancellationToken: arg3);
 
                 Directory.Delete(Path.Combine(_absPath, _newName), true);
 
