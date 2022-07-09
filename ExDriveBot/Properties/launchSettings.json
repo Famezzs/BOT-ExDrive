@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ExDriveBot": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
