@@ -59,26 +59,21 @@ namespace ExDriveBot
 
         private static long _chatid;
 
-        static void Main(string WEBPORT, string APISERVERPORT)
+        static void Main(string[] args)
         {
-            if (String.IsNullOrEmpty(WEBPORT))
+            if (args.Length == 2)
             {
-                _postUrl = "https://localhost:443/Storage/UploadTempFileBot";
+                _postUrl = $"https://localhost:{args[0]}/Storage/UploadTempFileBot";
+
+                _apiUrl = $"http://localhost:{args[1]}/";
             }
             else
             {
-                _postUrl = $"https://localhost:{WEBPORT}/Storage/UploadTempFileBot";
-            }
+                _postUrl = "https://localhost:44370/Storage/UploadTempFileBot";
 
-            if (String.IsNullOrEmpty(APISERVERPORT))
-            {
                 _apiUrl = "http://localhost:8081/";
             }
-            else
-            {
-                _apiUrl = $"http://localhost:{APISERVERPORT}/";
-            }
-
+            
             _client = new(_token, _http, _apiUrl);
 
             _clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
