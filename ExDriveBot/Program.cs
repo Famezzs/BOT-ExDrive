@@ -38,7 +38,7 @@ namespace ExDriveBot
 
     class Program
     {
-        private static readonly string _token = "***REMOVED***";
+        private static string _token = String.Empty;
 
         private static readonly string _auditName = "audit.json";
         private static readonly string _updatesName = "updates.json";
@@ -61,6 +61,8 @@ namespace ExDriveBot
 
         static void Main(string[] args)
         {
+            _token = Environment.GetEnvironmentVariable("BOT_TOKEN");
+
             if (args.Length == 2)
             {
                 _postUrl = $"https://localhost:{args[0]}/Storage/UploadTempFileBot";
@@ -184,7 +186,7 @@ namespace ExDriveBot
 
                 _newName = Guid.NewGuid().ToString();
 
-                System.IO.Directory.CreateDirectory(Path.Combine(_absPath, _newName));
+                Directory.CreateDirectory(Path.Combine(_absPath, _newName));
                 System.IO.File.Move(path, Path.Combine(_absPath, _newName, name));
 
                 string downloadlink = "";
@@ -240,14 +242,13 @@ namespace ExDriveBot
                 if (!string.IsNullOrEmpty(downloadlink))
                 {
                     SendMessageAsync($"Download link for \"{name}\": {downloadlink}", arg3);
+
+                    Directory.Delete(Path.Combine(_absPath, _newName), true);
                 }
                 else
                 {
-                    SendMessageAsync($@"Oops... We are sorry, but it looks like something went wrong. Please try again.",
-                        arg3);
+                    throw new Exception("File link is not valid");
                 }
-
-                Directory.Delete(Path.Combine(_absPath, _newName), true);
             }
             catch (Exception)
             {
