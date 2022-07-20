@@ -22,6 +22,8 @@ nupkg/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+ExDriveBot/[Pp]roperties/
+[Pp]roperties/
 x64/
 x86/
 build/
