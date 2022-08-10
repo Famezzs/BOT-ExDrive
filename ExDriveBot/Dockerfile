@@ -4,8 +4,8 @@ FROM mcr.microsoft.com/dotnet/runtime:5.0 AS base
 WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
-WORKDIR "/src/ExDriveBot/"
-COPY ["ExDriveBot.csproj", "ExDriveBot/"]
+WORKDIR /src
+COPY ["ExDriveBot/ExDriveBot.csproj", "ExDriveBot/"]
 RUN dotnet restore "ExDriveBot/ExDriveBot.csproj"
 COPY . .
 WORKDIR "/src/ExDriveBot"
