@@ -29,7 +29,6 @@ jobs:
 
   publish:
 
-    requires: build
     runs-on: ubuntu-latest
     steps:
       -
